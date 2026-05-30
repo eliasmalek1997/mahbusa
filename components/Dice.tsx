@@ -31,7 +31,7 @@ function DieFace({
     <div className="flex flex-col items-center gap-1">
       <div
         className={`
-          relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl border-2 shadow-lg
+          relative w-10 h-10 sm:w-13 sm:h-13 md:w-14 md:h-14 rounded-lg sm:rounded-xl border-2 shadow-lg
           transition-all duration-200
           ${rolling ? "animate-dice-roll" : ""}
           ${used

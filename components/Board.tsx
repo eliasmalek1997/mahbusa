@@ -178,8 +178,8 @@ export default function Board({
         <div className="absolute inset-0 bg-gradient-to-b from-amber-800/20 to-amber-950/20 pointer-events-none" />
 
         {/* Top row (points 12-23) */}
-        <div className="flex justify-between px-2 pt-2 border-b border-amber-950/50">
-          <div className="flex gap-0.5">
+        <div className="flex px-1 pt-1 border-b border-amber-950/50">
+          <div className="flex flex-1">
             {topPoints.slice(0, 6).map((i) => (
               <PointComponent
                 key={i}
@@ -187,9 +187,7 @@ export default function Board({
                 index={i}
                 isTop={true}
                 isLegal={isMyTurn && gameState.hasRolled && (
-                  selectedPoint !== null
-                    ? legalDestinations.has(i)
-                    : legalSources.has(i)
+                  selectedPoint !== null ? legalDestinations.has(i) : legalSources.has(i)
                 )}
                 isSelected={selectedPoint === i}
                 selectedFrom={selectedPoint}
@@ -198,10 +196,10 @@ export default function Board({
             ))}
           </div>
           {/* Bar */}
-          <div className="w-8 sm:w-10 bg-amber-950/60 flex items-center justify-center">
-            <div className="w-1 h-full bg-amber-900/50 rounded" />
+          <div className="w-4 sm:w-6 bg-amber-950/60 flex items-center justify-center flex-shrink-0">
+            <div className="w-0.5 h-full bg-amber-900/50 rounded" />
           </div>
-          <div className="flex gap-0.5">
+          <div className="flex flex-1">
             {topPoints.slice(6).map((i) => (
               <PointComponent
                 key={i}
@@ -209,9 +207,7 @@ export default function Board({
                 index={i}
                 isTop={true}
                 isLegal={isMyTurn && gameState.hasRolled && (
-                  selectedPoint !== null
-                    ? legalDestinations.has(i)
-                    : legalSources.has(i)
+                  selectedPoint !== null ? legalDestinations.has(i) : legalSources.has(i)
                 )}
                 isSelected={selectedPoint === i}
                 selectedFrom={selectedPoint}
@@ -222,7 +218,7 @@ export default function Board({
         </div>
 
         {/* Middle strip with dice */}
-        <div className="flex items-center justify-center py-3 gap-4 bg-amber-950/30 flex-wrap">
+        <div className="flex items-center justify-center py-1.5 sm:py-3 gap-2 sm:gap-4 bg-amber-950/30 flex-wrap min-h-[3.5rem] sm:min-h-[5rem]">
           {gameState.dice ? (
             <Dice
               values={gameState.dice.values}
@@ -231,27 +227,25 @@ export default function Board({
               rolling={rolling}
             />
           ) : (
-            <div className="h-14 flex items-center">
-              <p className="text-amber-300/50 text-sm italic">
-                {isMyTurn ? "Roll to start your turn" : "Waiting for opponent…"}
-              </p>
-            </div>
+            <p className="text-amber-300/50 text-xs sm:text-sm italic px-2 text-center">
+              {isMyTurn ? "Roll to start your turn" : "Waiting for opponent…"}
+            </p>
           )}
           {selectedCanOnlyBearOff && (
-            <p className="text-emerald-300 text-xs font-semibold animate-pulse">
+            <p className="text-emerald-300 text-[10px] sm:text-xs font-semibold animate-pulse text-center w-full px-2">
               Tap checker again to bear off ↗
             </p>
           )}
           {!selectedPoint && anyBearOffAvailable && isMyTurn && (
-            <p className="text-amber-300/60 text-xs italic">
+            <p className="text-amber-300/60 text-[10px] sm:text-xs italic text-center w-full px-2">
               You can bear off — tap a checker
             </p>
           )}
         </div>
 
         {/* Bottom row (points 11-0) */}
-        <div className="flex justify-between px-2 pb-2 border-t border-amber-950/50">
-          <div className="flex gap-0.5">
+        <div className="flex px-1 pb-1 border-t border-amber-950/50">
+          <div className="flex flex-1">
             {bottomPoints.slice(0, 6).map((i) => (
               <PointComponent
                 key={i}
@@ -270,10 +264,10 @@ export default function Board({
             ))}
           </div>
           {/* Bar */}
-          <div className="w-8 sm:w-10 bg-amber-950/60 flex items-center justify-center">
-            <div className="w-1 h-full bg-amber-900/50 rounded" />
+          <div className="w-4 sm:w-6 bg-amber-950/60 flex items-center justify-center flex-shrink-0">
+            <div className="w-0.5 h-full bg-amber-900/50 rounded" />
           </div>
-          <div className="flex gap-0.5">
+          <div className="flex flex-1">
             {bottomPoints.slice(6).map((i) => (
               <PointComponent
                 key={i}
