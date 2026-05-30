@@ -8,7 +8,9 @@ import { isMockMode } from "@/lib/supabase/client";
 
 export default function Home() {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("mahbusa_player_name") ?? "" : ""
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +27,7 @@ export default function Home() {
         `mahbusa_player_${roomCode}`,
         JSON.stringify({ player: 1, name: playerName })
       );
+      localStorage.setItem("mahbusa_player_name", playerName);
       router.push(`/game/${roomCode}`);
     } catch (e) {
       setError("Could not create game. Please try again.");

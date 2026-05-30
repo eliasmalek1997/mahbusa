@@ -11,9 +11,14 @@ import {
   joinGame,
   updateGameState,
   subscribeToGame,
+  getRoom,
+  subscribeToRoom,
+  rematch as rematchGame,
+  recordGameResult,
 } from "@/lib/supabase/gameRepository";
-import { GameRecord } from "@/lib/game/types";
+import { GameRecord, RoomRecord, RULESET } from "@/lib/game/types";
 import { isMockMode } from "@/lib/supabase/client";
+import { computeScore } from "@/lib/game/scoring";
 
 type PageStatus =
   | "loading"
@@ -30,13 +35,17 @@ export default function GamePage() {
 
   const [status, setStatus] = useState<PageStatus>("loading");
   const [gameRecord, setGameRecord] = useState<GameRecord | null>(null);
+  const [roomRecord, setRoomRecord] = useState<RoomRecord | null>(null);
   const [myPlayer, setMyPlayer] = useState<PlayerId | null>(null);
   const [myName, setMyName] = useState("");
-  const [nameInput, setNameInput] = useState("");
+  const [nameInput, setNameInput] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("mahbusa_player_name") ?? "" : ""
+  );
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isRematching, setIsRematching] = useState(false);
 
   // Undo
   const [undoEnabled, setUndoEnabled] = useState<boolean>(() => {
@@ -56,6 +65,15 @@ export default function GamePage() {
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const unsubRoomRef = useRef<(() => void) | null>(null);
+
+  // Tab title: notify when it's your turn
+  useEffect(() => {
+    if (status !== "playing" || !myPlayer || !gameRecord) return;
+    const isMyTurn = gameRecord.game_state?.currentTurn === myPlayer;
+    document.title = isMyTurn ? "🎲 Your turn! — Mahbusa" : "Mahbusa";
+    return () => { document.title = "Mahbusa"; };
+  }, [gameRecord?.game_state?.currentTurn, myPlayer, status]);
 
   const shareUrl =
     typeof window !== "undefined"
@@ -121,6 +139,7 @@ export default function GamePage() {
 
     const sessionKey = `mahbusa_player_${roomCode}`;
     sessionStorage.setItem(sessionKey, JSON.stringify({ player, name }));
+    localStorage.setItem("mahbusa_player_name", name);
     setMyPlayer(player);
     setMyName(name);
 
@@ -144,11 +163,15 @@ export default function GamePage() {
       if (unsubRef.current) unsubRef.current();
       unsubRef.current = subscribeToGame(code, handleUpdate);
 
+      if (unsubRoomRef.current) unsubRoomRef.current();
+      unsubRoomRef.current = subscribeToRoom(code, setRoomRecord);
+
       // Polling fallback every 2s
       if (pollingRef.current) clearInterval(pollingRef.current);
       pollingRef.current = setInterval(async () => {
-        const r = await getGame(code);
+        const [r, room] = await Promise.all([getGame(code), getRoom(code)]);
         if (r) handleUpdate(r);
+        if (room) setRoomRecord(room);
       }, 2000);
     },
     [handleUpdate]
@@ -158,6 +181,7 @@ export default function GamePage() {
     loadGame();
     return () => {
       if (unsubRef.current) unsubRef.current();
+      if (unsubRoomRef.current) unsubRoomRef.current();
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [loadGame]);
@@ -227,6 +251,31 @@ export default function GamePage() {
       setIsUpdating(false);
     }
   }, [undoStack, isUpdating, roomCode]);
+
+  const handleRematch = useCallback(async () => {
+    if (!gameRecord || isRematching) return;
+    const gs = validateGameState(gameRecord.game_state);
+    const winner = gs.winner;
+    if (!winner) return;
+    const gameScore = computeScore(gs, winner);
+    setIsRematching(true);
+    try {
+      const updated = await rematchGame(
+        roomCode,
+        gameRecord.player1_name,
+        gameRecord.player2_name,
+        winner,
+        gameScore
+      );
+      setGameRecord(updated);
+      setUndoStack([]);
+      const room = await getRoom(roomCode);
+      if (room) setRoomRecord(room);
+      setStatus("playing");
+    } finally {
+      setIsRematching(false);
+    }
+  }, [gameRecord, roomCode, isRematching]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -322,26 +371,78 @@ export default function GamePage() {
   }
 
   if (status === "complete") {
-    const winner = gameRecord?.winner;
+    const gs = gameRecord ? validateGameState(gameRecord.game_state) : null;
+    const winner = gs?.winner ?? gameRecord?.winner;
     const winnerName = winner === 1 ? gameRecord?.player1_name : gameRecord?.player2_name;
     const isWinner = winner === myPlayer;
+    const gameScore = gs && winner ? computeScore(gs, winner) : 0;
+
+    // Match scores (including this game's result, pending rematch button)
+    const pendingS1 = (roomRecord?.score_p1 ?? 0) + (winner === 1 ? gameScore : 0);
+    const pendingS2 = (roomRecord?.score_p2 ?? 0) + (winner === 2 ? gameScore : 0);
+    const matchWinner = pendingS1 >= RULESET.targetScore ? 1 : pendingS2 >= RULESET.targetScore ? 2 : null;
+
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6">
-        <div className="bg-stone-900 rounded-2xl border border-white/10 p-8 w-full max-w-sm shadow-2xl text-center space-y-6">
-          <div className="text-6xl">{isWinner ? "🏆" : "🎲"}</div>
+        <div className="bg-stone-900 rounded-2xl border border-white/10 p-8 w-full max-w-sm shadow-2xl text-center space-y-5">
+          <div className="text-5xl">{isWinner ? "🏆" : "🎲"}</div>
+
           <div>
             <h2 className="text-2xl font-bold text-stone-100">
               {isWinner ? "You won!" : `${winnerName} won!`}
             </h2>
-            <p className="text-stone-400 mt-2">Great game.</p>
+            <p className="text-stone-400 text-sm mt-1">+{gameScore} points</p>
           </div>
-          <Link
-            href="/"
-            className="block w-full py-3 bg-amber-700 hover:bg-amber-600 text-white
-              font-bold rounded-xl transition active:scale-95 text-center"
-          >
-            Play Again
-          </Link>
+
+          {/* Match score toward 31 */}
+          <div className="bg-stone-800 rounded-xl p-4 space-y-2">
+            <p className="text-stone-400 text-xs font-semibold uppercase tracking-wider">
+              Match score — first to {RULESET.targetScore}
+            </p>
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex-1 text-center">
+                <p className="text-stone-300 text-sm font-semibold truncate">{gameRecord?.player1_name || "P1"}</p>
+                <p className={`text-2xl font-bold ${pendingS1 >= RULESET.targetScore ? "text-emerald-400" : "text-stone-100"}`}>
+                  {pendingS1}
+                </p>
+                <p className="text-stone-500 text-xs">{roomRecord?.wins_p1 ?? 0} wins</p>
+              </div>
+              <div className="text-stone-600 font-bold">vs</div>
+              <div className="flex-1 text-center">
+                <p className="text-stone-300 text-sm font-semibold truncate">{gameRecord?.player2_name || "P2"}</p>
+                <p className={`text-2xl font-bold ${pendingS2 >= RULESET.targetScore ? "text-emerald-400" : "text-stone-100"}`}>
+                  {pendingS2}
+                </p>
+                <p className="text-stone-500 text-xs">{roomRecord?.wins_p2 ?? 0} wins</p>
+              </div>
+            </div>
+          </div>
+
+          {matchWinner ? (
+            <div className="bg-emerald-900/40 border border-emerald-500/30 rounded-xl p-3">
+              <p className="text-emerald-300 font-bold text-sm">
+                🏆 {matchWinner === 1 ? gameRecord?.player1_name : gameRecord?.player2_name} wins the match!
+              </p>
+            </div>
+          ) : null}
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleRematch}
+              disabled={isRematching}
+              className="flex-1 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-50
+                text-white font-bold rounded-xl transition active:scale-95"
+            >
+              {isRematching ? "Starting…" : "↺ Rematch"}
+            </button>
+            <Link
+              href="/"
+              className="flex-1 py-3 bg-stone-700 hover:bg-stone-600 text-white
+                font-bold rounded-xl transition active:scale-95 text-center text-sm"
+            >
+              Home
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -382,6 +483,23 @@ export default function GamePage() {
           </button>
         </div>
       </div>
+
+      {/* Match score strip */}
+      {roomRecord && (roomRecord.score_p1 > 0 || roomRecord.score_p2 > 0 || roomRecord.wins_p1 > 0 || roomRecord.wins_p2 > 0) && (
+        <div className="max-w-5xl mx-auto mb-3 px-2">
+          <div className="bg-stone-900/70 border border-white/10 rounded-xl px-4 py-2.5 flex items-center justify-between text-sm">
+            <div className="text-center">
+              <span className="text-stone-400 text-xs block">Match score</span>
+              <span className="font-bold text-stone-100">{roomRecord.score_p1} — {roomRecord.score_p2}</span>
+            </div>
+            <div className="text-stone-600 text-xs">of {RULESET.targetScore}</div>
+            <div className="text-center">
+              <span className="text-stone-400 text-xs block">Wins</span>
+              <span className="font-bold text-stone-100">{roomRecord.wins_p1} — {roomRecord.wins_p2}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Board
         gameState={gs}

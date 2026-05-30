@@ -44,6 +44,28 @@ export interface GameRecord {
   updated_at: string;
 }
 
+export interface RoomRecord {
+  room_code: string;
+  player1_name: string;
+  player2_name: string;
+  wins_p1: number;
+  wins_p2: number;
+  score_p1: number; // cumulative match score toward 31
+  score_p2: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Persian dice names used in Lebanese/Syrian Tawleh (Mahbusa)
+export const DICE_NAMES: Record<number, string> = {
+  1: "Yak",
+  2: "Do",
+  3: "Se",
+  4: "Char",
+  5: "Penj",
+  6: "Shesh",
+};
+
 export const RULESET = {
   variantName: "Lebanese Mahbusa",
   startingMode: "all_on_start_point" as const,

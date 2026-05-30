@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { GameState, Move, PlayerId } from "@/lib/game/types";
 import {
   getLegalMoves,
@@ -38,6 +38,7 @@ export default function Board({
   const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isActing, setIsActing] = useState(false);
+  const [rolling, setRolling] = useState(false);
 
   const isMyTurn = gameState.currentTurn === myPlayer;
   const legalMoves = isMyTurn && gameState.hasRolled ? getLegalMoves(gameState) : [];
@@ -227,6 +228,7 @@ export default function Board({
               values={gameState.dice.values}
               used={gameState.dice.used}
               isMyTurn={isMyTurn}
+              rolling={rolling}
             />
           ) : (
             <div className="h-14 flex items-center">
@@ -297,7 +299,11 @@ export default function Board({
         <div className="flex gap-3 justify-center flex-wrap">
           {!gameState.hasRolled && (
             <button
-              onClick={onRoll}
+              onClick={async () => {
+                setRolling(true);
+                await onRoll();
+                setTimeout(() => setRolling(false), 550);
+              }}
               disabled={isActing}
               className="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50
                 text-white font-bold rounded-xl shadow-lg shadow-emerald-900/40
