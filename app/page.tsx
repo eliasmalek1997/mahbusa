@@ -1,65 +1,112 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createGame, generateRoomCode } from "@/lib/supabase/gameRepository";
+import { initializeGame } from "@/lib/game/initialState";
+import { isMockMode } from "@/lib/supabase/client";
 
 export default function Home() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCreate = async () => {
+    const playerName = name.trim() || "Player 1";
+    setLoading(true);
+    setError(null);
+    try {
+      const roomCode = generateRoomCode();
+      const initialState = initializeGame();
+      await createGame(roomCode, playerName, initialState);
+
+      sessionStorage.setItem(
+        `mahbusa_player_${roomCode}`,
+        JSON.stringify({ player: 1, name: playerName })
+      );
+      router.push(`/game/${roomCode}`);
+    } catch (e) {
+      setError("Could not create game. Please try again.");
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6">
+      <div
+        className="absolute inset-0 opacity-5 pointer-events-none"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgba(255,200,100,0.4) 1px, transparent 0)",
+          backgroundSize: "32px 32px",
+        }}
+      />
+
+      <div className="relative z-10 w-full max-w-sm space-y-8 text-center">
+        <div className="space-y-3">
+          <div className="flex justify-center gap-2 text-3xl mb-2 select-none">
+            <span>🎲</span>
+            <span>🎲</span>
+          </div>
+          <h1 className="text-5xl font-extrabold tracking-tight text-stone-100">
+            Mahbusa
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-stone-400 text-lg leading-snug">
+            Play Lebanese backgammon together,
+            <br />
+            from anywhere.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div className="bg-stone-900 rounded-2xl border border-white/10 p-6 shadow-2xl space-y-4">
+          <input
+            className="w-full bg-stone-800 border border-white/10 rounded-xl px-4 py-3
+              text-stone-100 placeholder-stone-500 text-base focus:outline-none
+              focus:ring-2 focus:ring-amber-500 transition"
+            placeholder="Your name (optional)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !loading && handleCreate()}
+            maxLength={30}
+          />
+
+          {error && <p className="text-red-400 text-sm text-left">{error}</p>}
+
+          <button
+            onClick={handleCreate}
+            disabled={loading}
+            className="w-full py-3.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-60
+              text-white font-bold rounded-xl shadow-lg shadow-amber-900/30
+              transition-all duration-150 active:scale-95 text-base"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {loading ? "Creating…" : "Create Game"}
+          </button>
         </div>
-      </main>
-    </div>
+
+        {isMockMode && (
+          <div className="bg-stone-900/60 border border-amber-900/40 rounded-xl p-4 text-left space-y-1">
+            <p className="text-amber-500 text-xs font-semibold uppercase tracking-wider">
+              Local Mode
+            </p>
+            <p className="text-stone-400 text-xs leading-relaxed">
+              No Supabase config found. Running in local mock mode — open the
+              game URL in a second tab to test two-player gameplay.
+            </p>
+          </div>
+        )}
+
+        <p className="text-stone-600 text-xs">
+          No sign-up needed. Share a link. Play.
+        </p>
+
+        <Link
+          href="/simulate"
+          className="text-stone-600 hover:text-stone-400 text-xs transition underline underline-offset-2"
+        >
+          Simulation mode →
+        </Link>
+      </div>
+    </main>
   );
 }
